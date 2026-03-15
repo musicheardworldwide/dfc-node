@@ -2,5 +2,33 @@
 name = "dfc-node"
 version = "0.1.0"
 edition = "2024"
+description = "DFC node operator binary — runs gladiator matches on user-owned hardware"
+license = "MIT"
 
 [dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+bollard = { version = "0.18", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+bs58 = "0.5"
+base64 = "0.22"
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
+wiremock = "0.6"
+tempfile = "3"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

@@ -1,0 +1,28 @@
+# DFC Node Configuration
+# Copy to config.toml and fill in values
+
+# Coordinator API
+[coordinator]
+url = "https://api.dfc.gg"
+
+# Solana wallet (used for node registration + stake verification)
+[wallet]
+# Path to keypair JSON file (Solana CLI format)
+keypair_path = "~/.config/solana/id.json"
+
+# Docker settings
+[docker]
+# Image to use for gladiator containers
+image = "dfc-gladiator:armed"
+# Max concurrent matches this node will run
+max_concurrent = 2
+# Memory limit per container (bytes)
+memory_limit = 2147483648  # 2GB
+# CPU limit per container (nanocpus)
+cpu_limit = 2000000000     # 2 cores
+
+# Hardware capabilities reported to coordinator
+[hardware]
+gpu = false
+cpu_cores = 4
+memory_gb = 16
