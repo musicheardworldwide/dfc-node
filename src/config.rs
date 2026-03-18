@@ -18,6 +18,7 @@ pub struct CoordinatorConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct WalletConfig {
+    #[serde(default)]
     pub keypair_path: PathBuf,
 }
 

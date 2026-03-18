@@ -29,6 +29,10 @@ struct Cli {
     /// Path to config file
     #[arg(short, long, default_value = "config.toml")]
     config: String,
+
+    /// Beta mode — generate ephemeral wallet, skip real staking
+    #[arg(long)]
+    beta: bool,
 }
 
 #[tokio::main]
@@ -46,11 +50,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Loading config from {}", cli.config);
     let config = load_config(&cli.config)?;
 
-    // Load wallet
-    info!("Loading wallet from {:?}", config.wallet.keypair_path);
-    let keypair = wallet::load_keypair(&config.wallet.keypair_path)?;
+    // Load wallet (or generate ephemeral one in beta mode)
+    let keypair = if cli.beta {
+        info!("BETA MODE — generating ephemeral wallet (no real stake required)");
+        use ed25519_dalek::SigningKey;
+        SigningKey::generate(&mut rand::rngs::OsRng)
+    } else {
+        info!("Loading wallet from {:?}", config.wallet.keypair_path);
+        wallet::load_keypair(&config.wallet.keypair_path)?
+    };
     let address = wallet::wallet_address(&keypair);
-    info!(wallet = %address, "Wallet loaded");
+    info!(wallet = %address, "Wallet loaded{}", if cli.beta { " (ephemeral)" } else { "" });
 
     // Initialize Docker
     let docker_manager = DockerManager::new(config.docker.clone())?;
@@ -86,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             },
             region: detect_region(),
             public_ip: detect_public_ip().await.unwrap_or_else(|| "unknown".to_string()),
-            stake_amount: "0".to_string(),
+            stake_amount: if cli.beta { "0.00000000".to_string() } else { "0".to_string() },
         })
         .await?;
 
