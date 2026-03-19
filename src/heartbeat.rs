@@ -29,6 +29,7 @@ pub struct ReauthConfig {
 pub async fn heartbeat_loop(
     client: Arc<CoordinatorClient>,
     active_matches: ActiveMatchCount,
+    node_id: u64,
     token_store: TokenStore,
     reauth: ReauthConfig,
     cancel: CancellationToken,
@@ -59,7 +60,7 @@ pub async fn heartbeat_loop(
                 }
 
                 let metrics = collect_metrics(&active_matches);
-                match client.heartbeat(&metrics).await {
+                match client.heartbeat(node_id, &metrics).await {
                     Ok(()) => info!(
                         active_matches = metrics.active_matches,
                         cpu = format!("{:.1}%", metrics.cpu_usage_percent),

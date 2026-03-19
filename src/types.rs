@@ -26,7 +26,8 @@ pub struct NonceRequest {
 pub struct NonceResponse {
     pub nonce: String,
     pub message: String,
-    pub expires_at: String,
+    #[serde(default)]
+    pub expires_at: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

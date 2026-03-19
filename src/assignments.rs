@@ -20,6 +20,7 @@ pub async fn assignment_loop(
     docker: Arc<DockerManager>,
     active_matches: ActiveMatchCount,
     max_concurrent: u32,
+    node_id: u64,
     token_store: TokenStore,
     reauth: Arc<ReauthConfig>,
     cancel: CancellationToken,
@@ -40,7 +41,7 @@ pub async fn assignment_loop(
             }
         }
 
-        match client.poll_assignments(LONG_POLL_TIMEOUT_SECS).await {
+        match client.poll_assignments(node_id, LONG_POLL_TIMEOUT_SECS).await {
             Ok(assignments) if assignments.is_empty() => {
                 // No assignments — loop back to long-poll
                 continue;
@@ -77,7 +78,7 @@ pub async fn assignment_loop(
 
                     tokio::spawn(async move {
                         // Counter was already incremented above; execute_match decrements on exit.
-                        execute_match_inner(client, docker, active, assignment, cancel).await;
+                        execute_match_inner(client, docker, active, node_id, assignment, cancel).await;
                     });
                 }
             }
@@ -113,6 +114,7 @@ async fn execute_match_inner(
     client: Arc<CoordinatorClient>,
     docker: Arc<DockerManager>,
     active_matches: ActiveMatchCount,
+    node_id: u64,
     assignment: NodeAssignment,
     cancel: CancellationToken,
 ) {
@@ -185,7 +187,7 @@ async fn execute_match_inner(
         container_logs: None,
     };
 
-    match client.report_match(&report).await {
+    match client.report_match(node_id, &report).await {
         Ok(()) => info!(match_id, "Match result reported"),
         Err(e) => error!(match_id, error = %e, "Failed to report match result"),
     }

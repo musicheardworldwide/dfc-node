@@ -141,6 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let heartbeat_handle = tokio::spawn(heartbeat::heartbeat_loop(
         Arc::clone(&client),
         Arc::clone(&active_matches),
+        reg_resp.node_id,
         token_store.clone(),
         ReauthConfig {
             wallet_address: reauth.wallet_address.clone(),
@@ -158,6 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Arc::clone(&docker),
         Arc::clone(&active_matches),
         config.docker.max_concurrent,
+        reg_resp.node_id,
         token_store.clone(),
         Arc::clone(&reauth),
         cancel.clone(),

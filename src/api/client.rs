@@ -67,8 +67,8 @@ impl CoordinatorClient {
     }
 
     /// Send heartbeat to coordinator.
-    pub async fn heartbeat(&self, req: &NodeHeartbeatRequest) -> Result<(), ApiError> {
-        let url = format!("{}/api/nodes/heartbeat", self.base_url);
+    pub async fn heartbeat(&self, node_id: u64, req: &NodeHeartbeatRequest) -> Result<(), ApiError> {
+        let url = format!("{}/api/nodes/{}/heartbeat", self.base_url, node_id);
         let _resp = self.post_with_retry_with_auth_handler(&url, req).await?;
         Ok(())
     }
@@ -76,11 +76,12 @@ impl CoordinatorClient {
     /// Long-poll for match assignments.
     pub async fn poll_assignments(
         &self,
+        node_id: u64,
         timeout_seconds: u32,
     ) -> Result<Vec<NodeAssignment>, ApiError> {
         let url = format!(
-            "{}/api/nodes/assignments?timeout={}",
-            self.base_url, timeout_seconds
+            "{}/api/nodes/{}/assignments?timeout={}",
+            self.base_url, node_id, timeout_seconds
         );
         let token = self
             .token_store
@@ -116,8 +117,8 @@ impl CoordinatorClient {
     }
 
     /// Report match results to coordinator.
-    pub async fn report_match(&self, report: &NodeMatchReport) -> Result<(), ApiError> {
-        let url = format!("{}/api/nodes/report", self.base_url);
+    pub async fn report_match(&self, node_id: u64, report: &NodeMatchReport) -> Result<(), ApiError> {
+        let url = format!("{}/api/nodes/{}/report", self.base_url, node_id);
         let _resp = self.post_with_retry_with_auth_handler(&url, report).await?;
         Ok(())
     }
@@ -286,7 +287,7 @@ mod tests {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("GET"))
-            .and(path("/api/nodes/assignments"))
+            .and(path("/api/nodes/1/assignments"))
             .respond_with(ResponseTemplate::new(401).set_body_string("Unauthorized"))
             .mount(&mock_server)
             .await;
@@ -295,7 +296,7 @@ mod tests {
         store.set("expired-token".to_string(), 1).await;
         let client = CoordinatorClient::new(&mock_server.uri(), store);
 
-        let result = client.poll_assignments(5).await;
+        let result = client.poll_assignments(1, 5).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(is_unauthorized(&err), "Expected unauthorized error, got: {err}");
