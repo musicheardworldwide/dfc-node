@@ -1,5 +1,8 @@
-use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+use ed25519_dalek::{Signer, VerifyingKey};
 use std::path::Path;
+
+// Re-export for use in other modules
+pub use ed25519_dalek::SigningKey;
 
 /// Load a Solana keypair from a JSON file (Solana CLI format: [u8; 64] array).
 /// First 32 bytes are the secret key, last 32 are the public key.

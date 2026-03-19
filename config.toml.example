@@ -1,0 +1,23 @@
+[coordinator]
+# The DFC coordinator URL. Use HTTPS in production!
+url = "https://coordinator.dfc.gg"
+
+[wallet]
+# Path to your Solana CLI keypair JSON file
+keypair_path = "~/.config/solana/id.json"
+
+[docker]
+# Docker image for gladiator containers
+image = "dfc-gladiator:armed"
+# Maximum concurrent matches to run on this node
+max_concurrent = 2
+# Memory limit per container in bytes (2 GB default)
+memory_limit = 2147483648
+# CPU limit in nanoseconds (2 cores default)
+cpu_limit = 2000000000
+
+[hardware]
+# Set to true if you have a GPU available for gladiators
+gpu = false
+cpu_cores = 4
+memory_gb = 8

@@ -14,13 +14,14 @@ use std::sync::Arc;
 
 use clap::Parser;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::api::client::CoordinatorClient;
 use crate::auth::token::TokenStore;
 use crate::auth::wallet;
 use crate::config::load_config;
 use crate::docker::manager::DockerManager;
+use crate::heartbeat::ReauthConfig;
 use crate::types::{NodeHardwareSpecs, NodeRegistrationRequest};
 
 #[derive(Parser)]
@@ -49,6 +50,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Loading config from {}", cli.config);
     let config = load_config(&cli.config)?;
+
+    // P1-3: Warn if coordinator URL uses plain HTTP in non-beta mode
+    if config.coordinator.url.starts_with("http://") && !cli.beta {
+        warn!("╔══════════════════════════════════════════════════════════════╗");
+        warn!("║  ⚠  COORDINATOR URL USES PLAIN HTTP — NOT SECURE!          ║");
+        warn!("║  Bearer tokens and signed messages will be sent UNENCRYPTED ║");
+        warn!("║  Use HTTPS in production: coordinator.url = \"https://...\"   ║");
+        warn!("╚══════════════════════════════════════════════════════════════╝");
+    }
 
     // Load wallet (or generate ephemeral one in beta mode)
     let keypair = if cli.beta {
@@ -80,23 +90,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let nonce_resp = client.request_nonce(&address).await?;
     let signature = wallet::sign_message(&keypair, &nonce_resp.message);
 
+    let public_ip = detect_public_ip().await.unwrap_or_else(|| "unknown".to_string());
+    let region = detect_region();
+    let stake_amount = if cli.beta { "0.00000000".to_string() } else { "0".to_string() };
+    let hardware = NodeHardwareSpecs {
+        cpu_cores: config.hardware.cpu_cores,
+        memory_gb: config.hardware.memory_gb,
+        storage_gb: 100,
+        gpu_model: if config.hardware.gpu {
+            Some("unknown".to_string())
+        } else {
+            None
+        },
+    };
+
     let reg_resp = client
         .register(&NodeRegistrationRequest {
             wallet_address: address.clone(),
             signature,
-            hardware: NodeHardwareSpecs {
-                cpu_cores: config.hardware.cpu_cores,
-                memory_gb: config.hardware.memory_gb,
-                storage_gb: 100,
-                gpu_model: if config.hardware.gpu {
-                    Some("unknown".to_string())
-                } else {
-                    None
-                },
-            },
-            region: detect_region(),
-            public_ip: detect_public_ip().await.unwrap_or_else(|| "unknown".to_string()),
-            stake_amount: if cli.beta { "0.00000000".to_string() } else { "0".to_string() },
+            hardware: hardware.clone(),
+            region: region.clone(),
+            public_ip: public_ip.clone(),
+            stake_amount: stake_amount.clone(),
         })
         .await?;
 
@@ -107,6 +122,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         "Registered with coordinator"
     );
 
+    // Build re-auth config for token refresh (shared by heartbeat + assignment loops)
+    let reauth = Arc::new(ReauthConfig {
+        wallet_address: address.clone(),
+        keypair,
+        hardware,
+        region,
+        public_ip,
+        stake_amount,
+    });
+
     // Shared state
     let active_matches = Arc::new(AtomicU32::new(0));
     let cancel = CancellationToken::new();
@@ -116,6 +141,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let heartbeat_handle = tokio::spawn(heartbeat::heartbeat_loop(
         Arc::clone(&client),
         Arc::clone(&active_matches),
+        token_store.clone(),
+        ReauthConfig {
+            wallet_address: reauth.wallet_address.clone(),
+            keypair: reauth.keypair.clone(),
+            hardware: reauth.hardware.clone(),
+            region: reauth.region.clone(),
+            public_ip: reauth.public_ip.clone(),
+            stake_amount: reauth.stake_amount.clone(),
+        },
         cancel.clone(),
     ));
 
@@ -124,6 +158,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Arc::clone(&docker),
         Arc::clone(&active_matches),
         config.docker.max_concurrent,
+        token_store.clone(),
+        Arc::clone(&reauth),
         cancel.clone(),
     ));
 
